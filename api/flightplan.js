@@ -1,73 +1,81 @@
-// In-memory storage for flight data
-let currentFlightPlan = null;
-let currentPositionData = null;
+// Global variables to store the latest flight data
+// In a production environment, you would use a database
+let flightPlanData = null;
+let positionData = null;
 let lastUpdate = null;
 
-module.exports = (req, res) => {
-  // Set CORS headers to allow access from anywhere
+module.exports = async (req, res) => {
+  // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   
-  // Handle OPTIONS request (for CORS preflight)
+  // Handle OPTIONS request for CORS preflight
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
   
-  // Simple API key check
-  const apiKey = process.env.API_KEY;
-  if (apiKey) {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.split(' ')[1] !== apiKey) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-  }
-  
-  // Handle different HTTP methods
+  // Handle POST request (update flight data)
   if (req.method === 'POST') {
     try {
-      // Store the flight plan and position data from the MSFS bridge
+      // Validate API key
+      const apiKey = req.headers.authorization || '';
+      const expectedApiKey = process.env.API_KEY || 'flight-manager-secret-key';
+      
+      if (apiKey !== `Bearer ${expectedApiKey}`) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      
       const data = req.body;
       
-      // Update the stored data
+      if (!data) {
+        return res.status(400).json({ error: 'No data provided' });
+      }
+      
+      // Store the flight data
       if (data.flightPlan) {
-        currentFlightPlan = data.flightPlan;
+        flightPlanData = data.flightPlan;
       }
       
       if (data.position) {
-        currentPositionData = data.position;
+        positionData = data.position;
       }
       
       lastUpdate = new Date().toISOString();
       
-      return res.status(200).json({ 
-        success: true, 
-        message: 'Flight data stored successfully',
+      return res.status(200).json({
+        message: 'Flight data updated successfully',
         timestamp: lastUpdate
       });
     } catch (error) {
-      return res.status(500).json({ 
-        error: 'Failed to store flight data',
-        message: error.message
-      });
+      console.error('Error processing flight data:', error);
+      return res.status(500).json({ error: 'Internal server error' });
     }
-  } 
-  else if (req.method === 'GET') {
-    // Return the stored flight plan to the mobile app
-    if (!currentFlightPlan && !currentPositionData) {
-      return res.status(404).json({ 
-        error: 'No flight data available',
-        message: 'No flight data has been uploaded yet'
-      });
-    }
-    
-    return res.status(200).json({
-      flightPlan: currentFlightPlan,
-      position: currentPositionData,
-      lastUpdate
-    });
-  } 
-  else {
-    return res.status(405).json({ error: 'Method not allowed' });
   }
+  
+  // Handle GET request (retrieve flight data)
+  if (req.method === 'GET') {
+    try {
+      if (!flightPlanData && !positionData) {
+        return res.status(200).json({
+          message: 'No flight data available',
+          hasData: false,
+          lastUpdate: null
+        });
+      }
+      
+      return res.status(200).json({
+        flightPlan: flightPlanData,
+        position: positionData,
+        hasData: true,
+        lastUpdate
+      });
+    } catch (error) {
+      console.error('Error retrieving flight data:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+  
+  // Handle other request types
+  return res.status(405).json({ error: 'Method not allowed' });
 }; 
