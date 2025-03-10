@@ -1,0 +1,16 @@
+{
+  "name": "msfs-cloud-api",
+  "version": "1.0.0",
+  "description": "Cloud API for MSFS flight data integration with Flight Manager",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel deploy --prod"
+  },
+  "engines": {
+    "node": ">=18.x"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "vercel": "^33.5.1"
+  }
+} 
